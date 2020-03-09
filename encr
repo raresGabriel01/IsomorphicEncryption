@@ -1,0 +1,217 @@
+# Pentru primul subpunct: - verificarea daca p este prim sau nu se face clasic, parcurgand pana la [p/2]+1 pentru ca cauta posibili divizori
+#			  - determinarea celui mai mic generator se face in felul urmator: luam elementele din grupul multiplicativ pe rand si generam toate puterile acestora
+#			  la un moment dat vom da de o putere x egala cu 1 si exista 2 posibilitati: a) x != p-1 => g^(x+1) = g => ... , puterile se repeta, neacoperind toate nr din Zp* 
+#												     b) x = p-1, caz in care g este generator, si oprim cautarea
+# Pentru al doilea subpunct: utilizam un sir de caractere numit "alfabet" pentru a ne usura munca in felul urmator: caracterul t din text trece in alfabet(g^pozAlfabet(t))
+# Puterile lui g vor fi retinute intr un vector v
+#
+# Pentru ultimul subpunct folosim alfabetInvers, care este definit astfel : alfabetInvers[pozAlfabet] = litera care a fost criptata pentru a obtine litera aflata pe pozitia pozAlfabet din
+# alfabet. alfabetInvers se genereaza in acelasi timp cu vectorul de puteri ale lui g. daca in g[x] bag g^x, atunci in alfabetInvers[x] bag alfabet[g[x]]
+#
+#
+#	Set date de intrare: 
+#	p = 7, s-a obtinut ca Generatorul este 3(nu l-am afisat fiindca nu se cerea in enunt, dar e usor de facut), acad este criptat in bcbg si bcbg decriptat in acad 
+#	(lucrez cu litere mici, sper ca nu este o problema)
+#	p = 6, se afiseaza un mesaj corespunzator ce ne spune ca p nu este prim	
+#	p = 7, aaa este criptat in bbb si bbb este decriptat in aaa
+
+
+.data
+	p: .space 4							#declar p-ul
+	msgNuPrim: .asciiz "Numarul introdus nu este prim"		# mesaj corespunzator daca p nu e prim
+	newLine: .asciiz "\n"
+	v: .space 400
+	text: .space 400
+	text2: .space 400
+	alfabet: .asciiz "abcdefghijklmnopqrstuvwxyz"
+	sp: .byte '\n'
+	c: .byte '_'
+	a: .byte 'a'
+	alfabetInvers: .asciiz "________________________"
+.text
+
+main:
+	li $v0, 5							# citesc p-ul si dupa verific
+	syscall
+	sw $v0, p							#ii "atribui" lui p valoarea citita
+	rem $t0, $v0, 2							#retin restul impartirii la 2 in $t0
+	beq $t0, $zero, nuPrim						#daca este par, ma duc la nuPrim si afisez mesajul corespunzator
+	
+	
+
+	li $t1, 3							#luam un contor cu care parcurgem de la 3 pana la [p/2] pentru a determina 
+									#existenta unui posibil divizor
+
+	div $t2, $v0, 2							# in $t2 retin [p/2]						
+
+	j cautDiv							# ma duc la cautarea presupusilor divizori							
+	
+
+	
+	
+	
+
+cautDiv:
+
+	bgt $t1, $t2, continua						#merg cu $t1 pana in $t2 ; daca se termina loop-ul, atunci p e prim
+	rem $t0, $v0, $t1						#in $t0 retin restul impartirii lui $v0 (adica p) la $t1
+	beq $t0, $zero, nuPrim						#daca restul este 0, evident p nu e prim, si merg la mesaj corespunzator
+	addi $t1, $t1, 1						#altfel, incrementez
+	j cautDiv							#si continui loop-ul
+
+continua:								#daca am ajuns aici, atunci p ESTE un numar prim
+									#parcurgem numerele din Zp* (de la 2 la p-1)
+									#si verificam daca numarul este generator, astfel:
+
+	li $t0, 1							#folosim t0 drept contor si incepem numaratoarea de la 2 (mai jos o sa creasca)
+	lw $t1, p
+	addi $t1, $t1, -1						# $t1 = p-1 (limita superioara a loop-uli)
+	j cautaGen							# mergem la cautarea generatorului	
+
+
+cautaGen:
+
+	addi $t0, $t0, 1
+	
+	j verifGen							# ne aflam la elementul curent $t0 si vrem sa vedem daca e generator	
+									# nu trebuie sa ne ingrijoram de existenta generatorului
+									# stim cu siguranta ca acesta exista
+
+
+
+# un element g din Zp* este generator <=> g^a != 1 ptr orice a din {1,...,p-2} si g^(p-1)=1
+# daca ar exista a din {1,...,p-2} a.i. g^a = 1 => g^(a+1) = g = > g^(a+2) = g^2 .... (se repeta numerele pana la g^a, si nu le acopera pe toate,
+# deci nu e generator )
+
+
+verifGen:
+
+	li $t2, 1							#luam $t2 contor ce merge de la 1 la p-1 (adica $t1)
+	li $t3, 1							#in $t3 retinem $t0 * $t0 * ... * $t0 (de $t2 ori)
+	j loop
+loop:
+	bgt $t2, $t1, cautaGen						#daca depaseste limita, cautam mai departe generator
+	mul $t3, $t3, $t0						#folosim formula recursiva pentru produsul $t0 * ... * $t0
+	rem $t3, $t3, $v0
+	
+	
+
+	beq $t3, 1, cond						#daca e restul 1 sa mearga sa verifice daca $t2 e p-1 (nu tocmai elegant da'merge
+	addi $t2,$t2,1
+	j loop
+cond:
+	beq $t2, $t1, amGasitGen					#mergem la urmatorul pas daca am gasit generatorul
+	j cautaGen							#altfel, mai cautam
+
+amGasitGen:
+									#in $t0 am acum generatorul						
+	
+	#bagam acum toate puterile lui $t0 in v
+	li $t3, 1
+									#in $t1 am p-1
+	move $t2, $zero							#folosesc $t2 pe post de contor ptr adresa (creste din 4 in 4)							
+	sw $t3, v($t2)							# v[0] = 1 (adica $t3), pentru ca g^0 = 1
+	addi $t2, $t2, 4						# crestem adresa								#
+	li $t4, 1
+       									#o sa-l utilizam mai departe pe $t4 drept contor de putere (de la 1 la p-1
+									# pasul 0 realizandu-se deja (v[0]=1)
+	lb $t5,c
+	sb $t5, alfabetInvers($zero)					#utilizam si alfabetInvers (explicatie mai jos)
+	lb $t5, a
+	sb $t5, alfabetInvers($t4)
+
+	
+	j bagaInVect							#mergem sa bagam in vector
+	
+#################################################################################################################################################
+# alfabetInvers functioneaza in felul urmator: alfabetInvers[pozitieInAlfabet] = literaInitiala
+# spre ex, alfabetInvers[1] = 'a', pentru ca litera pe pozitia 1 in alfabet (adica 'b') este obtinuta prin criptarea lui 'a'
+# ne va ajuta sa DECRIPTAM mesajele (trebuie sa il vedem ca un soi de functie inversa)
+
+
+bagaInVect:
+	bge $t4, $t1, rupe
+	mul $t3, $t3, $t0
+	rem $t3, $t3, $v0			#bagam corespunzator valoarea puterii in vector
+	sw $t3, v($t2)
+	
+	lb $t5, alfabet($t4)			#de asemenea, pentru un minim de operatii, punem la punct si alfabetInvers
+	sb $t5, alfabetInvers($t3)
+	
+	
+		
+
+
+	addi $t4, $t4, 1			#mergem mai departe
+	addi $t2, $t2, 4
+	j bagaInVect
+
+rupe:							
+	
+	
+
+	la $a0, text
+	li $a1, 400
+	li $v0, 8
+	syscall
+					#citim textul de criptat
+	li $t0, 0
+	lb $t1, text($t0)
+	lb $t4, sp
+	j cripteaza
+
+cripteaza:
+	beqz $t1, rupe2				#conditie break loop
+	beq $t1, $t4, rupe2
+	move $t2, $t1
+	addi $t2, $t2, -97			#determinam a cata litera din alfabet este litera curenta
+	mul $t2, $t2, 4				
+	lw $t3, v($t2)				#raportat la adresa, determinam in ce se cripteaza
+	
+	lb $a0, alfabet($t3)			#incarcam in registrul argument si printam
+	
+	li $v0, 11
+	syscall
+
+	addi $t0, $t0, 1	
+	lb $t1, text($t0)
+
+	j cripteaza
+rupe2:
+	la $a0, newLine
+	li $v0, 4
+	syscall
+					#citim al doilea text
+	la $a0, text2
+	li $a1, 400	
+	li $v0, 8
+	syscall
+	
+
+	li $t0, 0
+	lb $t1, text2($t0)
+	
+
+	j decripteaza
+decripteaza:				#decriptam in mod analog, doar ca folosim alfabetInvers
+	
+	beq $t1, $t4, exit
+	beqz $t1, exit
+	move $t2, $t1
+	addi $t2, $t2, -97			#determinam a cata litera din alfabet este
+	#mul $t2, $t2, 4
+	lb $a0, alfabetInvers($t2)		#printam corespunzator	
+	li $v0, 11
+	syscall
+	addi $t0, $t0, 1
+	lb $t1, text2($t0)
+	j decripteaza
+
+nuPrim:									#mesaj corespunzator daca numarul introdus nu este prim
+	li $v0, 4
+	la $a0, msgNuPrim
+	syscall
+	j exit
+exit:				#inchidere functie
+	li $v0, 10
+	syscall
